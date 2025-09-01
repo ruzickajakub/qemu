@@ -36,6 +36,7 @@
 #include "ram.h"
 #include "migration.h"
 #include "migration-stats.h"
+#include "migration/snp.h"
 #include "migration/register.h"
 #include "migration/misc.h"
 #include "qemu-file.h"
@@ -63,6 +64,7 @@
 #include "sysemu/kvm.h"
 
 #include "hw/boards.h" /* for machine_dump_guest_core() */
+#include "hw/i386/x86.h"
 
 #if defined(__linux__)
 #include "qemu/userfaultfd.h"
@@ -1251,7 +1253,17 @@ static int ram_save_page(RAMState *rs, PageSearchStatus *pss)
     ram_addr_t offset = ((ram_addr_t)pss->page) << TARGET_PAGE_BITS;
     ram_addr_t current_addr = block->offset + offset;
 
-    p = block->host + offset;
+
+    if (x86_is_machine_confidential()) {
+        uint8_t buf[TARGET_PAGE_SIZE] = {0};
+        snp_package_page(current_addr);
+
+        MigrationState *s = migrate_get_current();
+        cpu_physical_memory_read(s->svsm_migration_page + DATA_BUFFER_OFFSET, buf, TARGET_PAGE_SIZE);
+        p = buf;
+    } else {
+        p = block->host + offset;
+    }
     trace_ram_save_page(block->idstr, (uint64_t)offset, p);
 
     XBZRLE_cache_lock();
@@ -1998,6 +2010,10 @@ static int ram_save_target_page_legacy(RAMState *rs, PageSearchStatus *pss)
 {
     ram_addr_t offset = ((ram_addr_t)pss->page) << TARGET_PAGE_BITS;
     int res;
+
+    if (x86_is_machine_confidential()) {
+        return ram_save_page(rs, pss);
+    }
 
     if (control_save_page(pss, offset, &res)) {
         return res;
@@ -3058,6 +3074,10 @@ static int ram_save_setup(QEMUFile *f, void *opaque, Error **errp)
 
     migration_ops = g_malloc0(sizeof(MigrationOps));
 
+    if (x86_is_machine_confidential()) {
+        snp_start_migration_handler();
+    }
+
     if (migrate_multifd()) {
         multifd_ram_save_setup();
         migration_ops->ram_save_target_page = ram_save_target_page_multifd;
@@ -3303,6 +3323,7 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
     }
 
     qemu_put_be64(f, RAM_SAVE_FLAG_EOS);
+
     return qemu_fflush(f);
 }
 

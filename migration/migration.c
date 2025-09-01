@@ -35,6 +35,7 @@
 #include "qemu-file.h"
 #include "channel.h"
 #include "migration/vmstate.h"
+#include "migration/snp.h"
 #include "block/block.h"
 #include "qapi/error.h"
 #include "qapi/clone-visitor.h"
@@ -218,7 +219,7 @@ static int migration_stop_vm(MigrationState *s, RunState state)
 {
     int ret;
 
-    migration_downtime_start(s);
+    //migration_downtime_start(s);
 
     s->vm_old_state = runstate_get();
     global_state_store();
@@ -2761,6 +2762,13 @@ static int migration_completion_precopy(MigrationState *s,
                                         int *current_active_state)
 {
     int ret;
+
+    if(x86_is_machine_confidential()) {
+        migration_downtime_start(s);
+        bool in_postcopy = migration_in_postcopy();
+        qemu_savevm_state_complete_precopy_iterable_ram(s->to_dst_file, in_postcopy);
+        snp_stop_migration_handler();
+    }
 
     bql_lock();
 

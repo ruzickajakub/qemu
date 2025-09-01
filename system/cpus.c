@@ -296,9 +296,13 @@ static int do_vm_stop(RunState state, bool send_stop)
         runstate_set(state);
         cpu_disable_ticks();
         if (oldstate == RUN_STATE_RUNNING) {
-            pause_all_vcpus();
+            if (state != RUN_STATE_FINISH_MIGRATE) {
+                pause_all_vcpus();
+            }
         }
-        vm_state_notify(0, state);
+        if (state != RUN_STATE_FINISH_MIGRATE) {
+            vm_state_notify(0, state);
+        }
         if (send_stop) {
             qapi_event_send_stop();
         }

@@ -36,6 +36,7 @@
 #include "ram.h"
 #include "migration.h"
 #include "migration-stats.h"
+#include "migration/snp.h"
 #include "migration/register.h"
 #include "migration/misc.h"
 #include "qemu-file.h"
@@ -63,6 +64,8 @@
 #include "sysemu/kvm.h"
 
 #include "hw/boards.h" /* for machine_dump_guest_core() */
+#include "hw/i386/x86.h"
+
 
 #if defined(__linux__)
 #include "qemu/userfaultfd.h"
@@ -1251,7 +1254,17 @@ static int ram_save_page(RAMState *rs, PageSearchStatus *pss)
     ram_addr_t offset = ((ram_addr_t)pss->page) << TARGET_PAGE_BITS;
     ram_addr_t current_addr = block->offset + offset;
 
-    p = block->host + offset;
+
+    if (x86_is_machine_confidential()) {
+        uint8_t buf[TARGET_PAGE_SIZE] = {0};
+        snp_package_page(current_addr);
+
+        MigrationState *s = migrate_get_current();
+        cpu_physical_memory_read(s->svsm_migration_page, buf, TARGET_PAGE_SIZE);
+        p = buf;
+    } else {
+        p = block->host + offset;
+    }
     trace_ram_save_page(block->idstr, (uint64_t)offset, p);
 
     XBZRLE_cache_lock();
@@ -1999,6 +2012,10 @@ static int ram_save_target_page_legacy(RAMState *rs, PageSearchStatus *pss)
     ram_addr_t offset = ((ram_addr_t)pss->page) << TARGET_PAGE_BITS;
     int res;
 
+    if (x86_is_machine_confidential()) {
+        return ram_save_page(rs, pss);
+    }
+
     if (control_save_page(pss, offset, &res)) {
         return res;
     }
@@ -2384,6 +2401,9 @@ static void ram_save_cleanup(void *opaque)
         }
     }
 
+    if(x86_is_machine_confidential()) {
+        snp_stop_migration_handler();
+    }
     ram_bitmaps_destroy();
 
     xbzrle_cleanup();
@@ -3058,6 +3078,10 @@ static int ram_save_setup(QEMUFile *f, void *opaque, Error **errp)
 
     migration_ops = g_malloc0(sizeof(MigrationOps));
 
+    if (x86_is_machine_confidential()) {
+        snp_start_migration_handler();
+    }
+
     if (migrate_multifd()) {
         multifd_ram_save_setup();
         migration_ops->ram_save_target_page = ram_save_target_page_multifd;
@@ -3264,9 +3288,9 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
         /* flush all remaining blocks regardless of rate limiting */
         qemu_mutex_lock(&rs->bitmap_mutex);
         while (true) {
-            int pages;
+            int pages = 0;
 
-            pages = ram_find_and_save_block(rs);
+            // pages = ram_find_and_save_block(rs);
             /* no more blocks to sent */
             if (pages == 0) {
                 break;
@@ -3303,6 +3327,11 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
     }
 
     qemu_put_be64(f, RAM_SAVE_FLAG_EOS);
+
+    qemu_log("KUBA: snp_package_page\n");
+    snp_package_page(0x0);
+    qemu_log("KUBA: snp_package_page: DONE\n");
+
     return qemu_fflush(f);
 }
 

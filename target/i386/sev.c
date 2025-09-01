@@ -1667,9 +1667,11 @@ sev_snp_launch_finish(SevCommonState *sev_common)
     sev_set_guest_state(sev_common, SEV_STATE_RUNNING);
 
     /* add migration blocker */
+    /*
     error_setg(&sev_mig_blocker,
                "SEV-SNP: Migration is not implemented");
     ret = migrate_add_blocker(&sev_mig_blocker, &local_err);
+    */
     if (local_err) {
         error_report_err(local_err);
         error_free(sev_mig_blocker);

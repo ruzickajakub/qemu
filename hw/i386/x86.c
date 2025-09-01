@@ -38,6 +38,7 @@
 #include "hw/nmi.h"
 #include "kvm/kvm_i386.h"
 
+#include "exec/confidential-guest-support.h"
 
 void init_topo_info(X86CPUTopoInfo *topo_info,
                     const X86MachineState *x86ms)
@@ -54,6 +55,21 @@ void init_topo_info(X86CPUTopoInfo *topo_info,
     topo_info->modules_per_die = ms->smp.modules;
     topo_info->cores_per_module = ms->smp.cores;
     topo_info->threads_per_core = ms->smp.threads;
+}
+
+/*
+ * Returns true if the machine is confidential
+ *
+ * FIXME: Implementation only for the proof-of-concept.
+ */
+bool x86_is_machine_confidential(void)
+{
+    ConfidentialGuestSupport *cgs = MACHINE(qdev_get_machine())->cgs;
+
+    if (cgs != NULL && cgs->ready) {
+        return true;
+    }
+    return false;
 }
 
 /*

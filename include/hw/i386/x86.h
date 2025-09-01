@@ -114,6 +114,7 @@ struct X86MachineState {
 OBJECT_DECLARE_TYPE(X86MachineState, X86MachineClass, X86_MACHINE)
 
 void init_topo_info(X86CPUTopoInfo *topo_info, const X86MachineState *x86ms);
+bool x86_is_machine_confidential(void);
 uint32_t x86_cpu_apic_id_from_index(X86MachineState *x86ms,
                                     unsigned int cpu_index);
 

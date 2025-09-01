@@ -457,6 +457,9 @@ struct MigrationState {
     bool switchover_acked;
     /* Is this a rdma migration */
     bool rdma_migration;
+
+    /* Migration page address of the SVSM's migration handler */
+    uint64_t svsm_migration_page;
 };
 
 void migrate_set_state(MigrationStatus *state, MigrationStatus old_state,

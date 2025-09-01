@@ -53,6 +53,7 @@
 #include "io/channel-tls.h"
 #include "migration/colo.h"
 #include "hw/boards.h"
+#include "hw/i386/x86.h"
 #include "monitor/monitor.h"
 #include "net/announce.h"
 #include "qemu/queue.h"
@@ -1736,6 +1737,11 @@ int migrate_init(MigrationState *s, Error **errp)
     s->threshold_size = 0;
     s->switchover_acked = false;
     s->rdma_migration = false;
+    s->svsm_migration_page = 0x0;
+    /* set svsm_migration_page only for confidential guests */
+    if (x86_is_machine_confidential()) {
+        s->svsm_migration_page = 0x8000f1c000;
+    }
     /*
      * set mig_stats memory to zero for a new migration
      */

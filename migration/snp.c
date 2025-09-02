@@ -60,17 +60,32 @@ void snp_stop_migration_handler(void) {
 }
 
 /* Helper function */
-static bool all_vcpus_running(void)
-{
-    CPUState *cpu;
-    CPU_FOREACH(cpu) {
-        if (cpu->stopped) {
-            qemu_log("CPU stopped %d\n", cpu->cpu_index);
-            return false;
-        }
-    }
-    return true;
-}
+// static bool all_vcpus_running(void)
+// {
+//     CPUState *cpu;
+//     CPU_FOREACH(cpu) {
+//         if (cpu->cpu_index == 3) {
+//             qemu_log("CPU kick\n");
+//             qemu_cpu_kick(cpu);
+//         }
+//         /*
+//         if (cpu->stopped) {
+//             qemu_log("KUBA: CPU stopped %d\n", cpu->cpu_index);
+//             //return false;
+//         }
+//         if (cpu->stopped && cpu->cpu_index == 3) {
+//             qemu_log("Before resume: Stopped: %b\n", cpu->stopped);
+//             qemu_log("CPU stopped %d\n", cpu->cpu_index);
+//             //cpu_resume(cpu);
+//             qemu_log("Running %b\n", cpu->running);
+//             qemu_log("Stopped %b\n", cpu->stopped);
+//             //return true;
+//             //return false;
+//         }
+//         */
+//     }
+//     return true;
+// }
 
 uint64_t snp_package_page(ram_addr_t guest_physical_addr) {
     // Send address to the guest
@@ -80,12 +95,29 @@ uint64_t snp_package_page(ram_addr_t guest_physical_addr) {
     MigrationState *s = migrate_get_current();
     // Wait for data to be ready
     uint64_t value = 0x0; // Value different from SNP_MIGRATION_DATA_READY
+
+    uint64_t iterations = 0;
     do {
         value = read_data_register();
+        iterations += 1;
+        //qemu_log("Data register: %lx\n", value);
+        if (iterations % 10000000 == 0) {
+            CPUState *cpu;
+            CPU_FOREACH(cpu) {
+                if (cpu->cpu_index == 3) {
+                    qemu_log("CPU kick\n");
+                    qemu_cpu_kick(cpu);
+                }
+            }
+            iterations = 0;
+        }
+        /*
         if (!all_vcpus_running()) {
             return s->svsm_migration_page + DATA_BUFFER_OFFSET;
         }
+        */
     } while (value != SNP_MIGRATION_DATA_READY);
+    qemu_log("guest_physical_addr: %lx\n", guest_physical_addr);
     // Returning the pointer to the buffer holding the packaged page.
     return s->svsm_migration_page + DATA_BUFFER_OFFSET;
 }

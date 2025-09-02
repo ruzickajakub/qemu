@@ -288,7 +288,9 @@ bool vm_get_suspended(void)
 
 static int do_vm_stop(RunState state, bool send_stop)
 {
+    qemu_log("KUBA: do_vm_stop\n");
     int ret = 0;
+    /*
     RunState oldstate = runstate_get();
 
     if (runstate_is_live(oldstate)) {
@@ -296,10 +298,12 @@ static int do_vm_stop(RunState state, bool send_stop)
         runstate_set(state);
         cpu_disable_ticks();
         if (oldstate == RUN_STATE_RUNNING) {
+            qemu_log("KUBA: pause all vcpus\n");
             pause_all_vcpus();
         }
         vm_state_notify(0, state);
         if (send_stop) {
+            qemu_log("KUBA: send stop\n");
             qapi_event_send_stop();
         }
     }
@@ -307,6 +311,7 @@ static int do_vm_stop(RunState state, bool send_stop)
     bdrv_drain_all();
     ret = bdrv_flush_all();
     trace_vm_stop_flush_all(ret);
+    */
 
     return ret;
 }
@@ -432,6 +437,12 @@ void run_on_cpu(CPUState *cpu, run_on_cpu_func func, run_on_cpu_data data)
 
 static void qemu_cpu_stop(CPUState *cpu, bool exit)
 {
+    //qemu_log("KUBA: qemu_cpu_stop: cpu->cpu_index: %d; exit: %b\n", cpu->cpu_index, exit);
+    /*
+    if (cpu->cpu_index == 3) {
+        return;
+    }
+    */
     g_assert(qemu_cpu_is_self(cpu));
     cpu->stop = false;
     cpu->stopped = true;
@@ -570,6 +581,7 @@ void cpu_thread_signal_destroyed(CPUState *cpu)
 
 void cpu_pause(CPUState *cpu)
 {
+    qemu_log("cpu_pause: %d\n", cpu->cpu_index);
     if (qemu_cpu_is_self(cpu)) {
         qemu_cpu_stop(cpu, true);
     } else {
@@ -590,6 +602,9 @@ static bool all_vcpus_paused(void)
     CPUState *cpu;
 
     CPU_FOREACH(cpu) {
+        if (cpu->cpu_index == 3) {
+            continue;
+        }
         if (!cpu->stopped) {
             return false;
         }
@@ -604,6 +619,9 @@ void pause_all_vcpus(void)
 
     qemu_clock_enable(QEMU_CLOCK_VIRTUAL, false);
     CPU_FOREACH(cpu) {
+        if (cpu->cpu_index == 3) {
+            continue;
+        }
         cpu_pause(cpu);
     }
 

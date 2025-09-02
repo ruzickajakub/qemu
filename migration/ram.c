@@ -1254,6 +1254,19 @@ static int ram_save_page(RAMState *rs, PageSearchStatus *pss)
     ram_addr_t offset = ((ram_addr_t)pss->page) << TARGET_PAGE_BITS;
     ram_addr_t current_addr = block->offset + offset;
 
+    /*
+    MemoryRegion *mr = block->mr;
+    hwaddr addr = mr->addr;
+    Int128 size = mr->size;
+    qemu_log("KUBA: offset: %lx ; hwaddr: %lx ; name: %s\n", offset, addr, mr->name);
+    uint64_t hi = (uint64_t)((__uint128_t)size >> 64);
+    uint64_t lo = (uint64_t)size;
+    if (hi == 0) {
+        qemu_log("0x%lx\n", lo);
+    } else {
+        qemu_log("0x%lx%016lx\n", hi, lo);
+    }
+    */
 
     if (x86_is_machine_confidential()) {
         uint8_t buf[TARGET_PAGE_SIZE] = {0};

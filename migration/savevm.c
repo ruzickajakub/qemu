@@ -1605,6 +1605,7 @@ int qemu_savevm_state_complete_precopy_non_iterable(QEMUFile *f,
 int qemu_savevm_state_complete_precopy(QEMUFile *f, bool iterable_only,
                                        bool inactivate_disks)
 {
+    qemu_log("KUBA: qemu_savevm_state_complete_precopy");
     int ret;
     Error *local_err = NULL;
     bool in_postcopy = migration_in_postcopy();

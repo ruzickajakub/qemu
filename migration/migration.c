@@ -216,14 +216,17 @@ static gint page_request_addr_cmp(gconstpointer ap, gconstpointer bp)
 
 static int migration_stop_vm(MigrationState *s, RunState state)
 {
-    int ret;
+    //int ret;
+    int ret = 0;
 
     migration_downtime_start(s);
 
+    /*
     s->vm_old_state = runstate_get();
     global_state_store();
 
     ret = vm_stop_force_state(state);
+    */
 
     trace_vmstate_downtime_checkpoint("src-vm-stopped");
     trace_migration_completion_vm_stop(ret);
@@ -2766,6 +2769,7 @@ static int migration_completion_precopy(MigrationState *s,
 
     if (!migrate_mode_is_cpr(s)) {
         ret = migration_stop_vm(s, RUN_STATE_FINISH_MIGRATE);
+
         if (ret < 0) {
             goto out_unlock;
         }
@@ -2847,7 +2851,12 @@ static void migration_completion(MigrationState *s)
     Error *local_err = NULL;
 
     if (s->state == MIGRATION_STATUS_ACTIVE) {
-        ret = migration_completion_precopy(s, &current_active_state);
+        s->vm_old_state = runstate_get();
+        global_state_store();
+        runstate_set(RUN_STATE_FINISH_MIGRATE);
+        if (false) {
+            ret = migration_completion_precopy(s, &current_active_state);
+        }
     } else if (s->state == MIGRATION_STATUS_POSTCOPY_ACTIVE) {
         migration_completion_postcopy(s);
     } else {
@@ -3568,6 +3577,7 @@ static void *migration_thread(void *opaque)
     }
 
 out:
+    qemu_log("KUBA: migration thread finish\n");
     trace_migration_thread_after_loop();
     migration_iteration_finish(s);
     object_unref(OBJECT(s));

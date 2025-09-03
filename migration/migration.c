@@ -2760,19 +2760,21 @@ static int migration_maybe_pause(MigrationState *s,
 static int migration_completion_precopy(MigrationState *s,
                                         int *current_active_state)
 {
-    int ret;
+    int ret = 0;
 
     bql_lock();
 
     if (!migrate_mode_is_cpr(s)) {
-        ret = migration_stop_vm(s, RUN_STATE_FINISH_MIGRATE);
+        //ret = migration_stop_vm(s, RUN_STATE_FINISH_MIGRATE);
         if (ret < 0) {
             goto out_unlock;
         }
     }
 
+    /*
     ret = migration_maybe_pause(s, current_active_state,
                                 MIGRATION_STATUS_DEVICE);
+    */
     if (ret < 0) {
         goto out_unlock;
     }
@@ -2781,10 +2783,11 @@ static int migration_completion_precopy(MigrationState *s,
      * Inactivate disks except in COLO, and track that we have done so in order
      * to remember to reactivate them if migration fails or is cancelled.
      */
-    s->block_inactive = !migrate_colo();
-    migration_rate_set(RATE_LIMIT_DISABLED);
+    //s->block_inactive = !migrate_colo();
+    //migration_rate_set(RATE_LIMIT_DISABLED);
     ret = qemu_savevm_state_complete_precopy(s->to_dst_file, false,
                                              s->block_inactive);
+
 out_unlock:
     bql_unlock();
     return ret;
@@ -2846,11 +2849,15 @@ static void migration_completion(MigrationState *s)
     int current_active_state = s->state;
     Error *local_err = NULL;
 
+    qemu_log("KUBA: migration_completion\n");
     if (s->state == MIGRATION_STATUS_ACTIVE) {
         runstate_set(RUN_STATE_FINISH_MIGRATE);
-        if (false) {
-            ret = migration_completion_precopy(s, &current_active_state);
-        }
+        //migration_downtime_start(s);
+        //if (false) {
+        qemu_log("KUBA: migration_completion_precopy\n");
+        ret = migration_completion_precopy(s, &current_active_state);
+        qemu_log("KUBA: migration_completion_precopy finished\n");
+        //}
     } else if (s->state == MIGRATION_STATUS_POSTCOPY_ACTIVE) {
         migration_completion_postcopy(s);
     } else {

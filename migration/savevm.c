@@ -68,6 +68,7 @@
 #include "yank_functions.h"
 #include "sysemu/qtest.h"
 #include "options.h"
+#include "migration/snp.h"
 
 const unsigned int postcopy_ram_discard_version;
 
@@ -1489,6 +1490,12 @@ void qemu_savevm_state_complete_postcopy(QEMUFile *f)
     qemu_fflush(f);
 }
 
+static void kuba_test_package(int identifier) {
+    qemu_log("KUBA: snp_package_page: %d\n", identifier);
+    snp_package_page(0x0);
+    qemu_log("KUBA: snp_package_page: %d : DONE\n", identifier);
+}
+
 static
 int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
 {
@@ -1497,6 +1504,8 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
     int ret;
 
     QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
+        qemu_log("iterable %s\n", se->idstr);
+        kuba_test_package(10);
         if (!se->ops ||
             (in_postcopy && se->ops->has_postcopy &&
              se->ops->has_postcopy(se->opaque)) ||
@@ -1515,7 +1524,9 @@ int qemu_savevm_state_complete_precopy_iterable(QEMUFile *f, bool in_postcopy)
 
         save_section_header(f, se, QEMU_VM_SECTION_END);
 
-        ret = se->ops->save_live_complete_precopy(f, se->opaque);
+        if (!se->is_ram) {
+            ret = se->ops->save_live_complete_precopy(f, se->opaque);
+        }
         trace_savevm_section_end(se->idstr, se->section_id, ret);
         save_section_footer(f, se);
         if (ret < 0) {
@@ -1618,7 +1629,10 @@ int qemu_savevm_state_complete_precopy(QEMUFile *f, bool iterable_only,
     cpu_synchronize_all_states();
 
     if (!in_postcopy || iterable_only) {
-        ret = qemu_savevm_state_complete_precopy_iterable(f, in_postcopy);
+        //if (false) {
+            ret = qemu_savevm_state_complete_precopy_iterable(f, in_postcopy);
+        //}
+        ret = 0;
         if (ret) {
             return ret;
         }

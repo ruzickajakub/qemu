@@ -34,6 +34,7 @@
 #include "savevm.h"
 #include "qemu-file.h"
 #include "channel.h"
+#include "migration/snp.h"
 #include "migration/vmstate.h"
 #include "block/block.h"
 #include "qapi/error.h"
@@ -77,6 +78,12 @@ static NotifierWithReturnList migration_state_notifiers[] = {
     NOTIFIER_ELEM_INIT(migration_state_notifiers, MIG_MODE_NORMAL),
     NOTIFIER_ELEM_INIT(migration_state_notifiers, MIG_MODE_CPR_REBOOT),
 };
+
+static void kuba_test_package(int identifier) {
+    qemu_log("KUBA: snp_package_page: %d\n", identifier);
+    snp_package_page(0x0);
+    qemu_log("KUBA: snp_package_page: %d : DONE\n", identifier);
+}
 
 /* Messages sent on the return path from destination to source */
 enum mig_rp_message_type {
@@ -2764,6 +2771,7 @@ static int migration_completion_precopy(MigrationState *s,
 
     bql_lock();
 
+    kuba_test_package(2);
     if (!migrate_mode_is_cpr(s)) {
         //ret = migration_stop_vm(s, RUN_STATE_FINISH_MIGRATE);
         if (ret < 0) {
@@ -2771,10 +2779,9 @@ static int migration_completion_precopy(MigrationState *s,
         }
     }
 
-    /*
+    kuba_test_package(3);
     ret = migration_maybe_pause(s, current_active_state,
                                 MIGRATION_STATUS_DEVICE);
-    */
     if (ret < 0) {
         goto out_unlock;
     }
@@ -2783,10 +2790,12 @@ static int migration_completion_precopy(MigrationState *s,
      * Inactivate disks except in COLO, and track that we have done so in order
      * to remember to reactivate them if migration fails or is cancelled.
      */
-    //s->block_inactive = !migrate_colo();
-    //migration_rate_set(RATE_LIMIT_DISABLED);
+    s->block_inactive = !migrate_colo();
+    migration_rate_set(RATE_LIMIT_DISABLED);
+    kuba_test_package(4);
     ret = qemu_savevm_state_complete_precopy(s->to_dst_file, false,
                                              s->block_inactive);
+    kuba_test_package(5);
 
 out_unlock:
     bql_unlock();
@@ -2837,6 +2846,7 @@ static void migration_completion_failed(MigrationState *s,
                       MIGRATION_STATUS_FAILED);
 }
 
+
 /**
  * migration_completion: Used by migration_thread when there's not much left.
  *   The caller 'breaks' the loop when this returns.
@@ -2845,6 +2855,7 @@ static void migration_completion_failed(MigrationState *s,
  */
 static void migration_completion(MigrationState *s)
 {
+    kuba_test_package(1);
     int ret = 0;
     int current_active_state = s->state;
     Error *local_err = NULL;

@@ -2847,7 +2847,10 @@ static void migration_completion(MigrationState *s)
     Error *local_err = NULL;
 
     if (s->state == MIGRATION_STATUS_ACTIVE) {
-        ret = migration_completion_precopy(s, &current_active_state);
+        runstate_set(RUN_STATE_FINISH_MIGRATE);
+        if (false) {
+            ret = migration_completion_precopy(s, &current_active_state);
+        }
     } else if (s->state == MIGRATION_STATUS_POSTCOPY_ACTIVE) {
         migration_completion_postcopy(s);
     } else {

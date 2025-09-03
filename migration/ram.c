@@ -1132,9 +1132,23 @@ void ram_release_page(const char *rbname, uint64_t offset)
 static int save_zero_page(RAMState *rs, PageSearchStatus *pss,
                           ram_addr_t offset)
 {
-    uint8_t *p = pss->block->host + offset;
+    qemu_log("KUBA: save_zero_page\n");
+    uint8_t *p; // = pss->block->host + offset;
     QEMUFile *file = pss->pss_channel;
     int len = 0;
+
+    if (x86_is_machine_confidential()) {
+        uint8_t buf[TARGET_PAGE_SIZE] = {0};
+        ram_addr_t current_addr = pss->block->offset + offset;
+        snp_package_page(current_addr);
+
+        MigrationState *s = migrate_get_current();
+        cpu_physical_memory_read(s->svsm_migration_page, buf, TARGET_PAGE_SIZE);
+        p = buf;
+    } else {
+        p = pss->block->host + offset;
+    }
+    qemu_log("KUBA: save_zero_page: continue\n");
 
     if (migrate_zero_page_detection() == ZERO_PAGE_DETECTION_NONE) {
         return 0;
@@ -1247,13 +1261,13 @@ static int save_normal_page(PageSearchStatus *pss, RAMBlock *block,
  */
 static int ram_save_page(RAMState *rs, PageSearchStatus *pss)
 {
+    //qemu_log("KUBA: ram_save_page\n");
     int pages = -1;
     uint8_t *p;
     bool send_async = true;
     RAMBlock *block = pss->block;
     ram_addr_t offset = ((ram_addr_t)pss->page) << TARGET_PAGE_BITS;
     ram_addr_t current_addr = block->offset + offset;
-
 
     if (x86_is_machine_confidential()) {
         uint8_t buf[TARGET_PAGE_SIZE] = {0};
@@ -1265,6 +1279,7 @@ static int ram_save_page(RAMState *rs, PageSearchStatus *pss)
     } else {
         p = block->host + offset;
     }
+    //qemu_log("KUBA: ram_save_page: continue\n");
     trace_ram_save_page(block->idstr, (uint64_t)offset, p);
 
     XBZRLE_cache_lock();
@@ -2016,9 +2031,11 @@ static int ram_save_target_page_legacy(RAMState *rs, PageSearchStatus *pss)
         return res;
     }
 
+    /*
     if (save_zero_page(rs, pss, offset)) {
         return 1;
     }
+    */
 
     return ram_save_page(rs, pss);
 }

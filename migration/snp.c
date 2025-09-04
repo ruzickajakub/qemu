@@ -14,6 +14,7 @@
 #include "snp.h"
 #include "trace.h"
 #include "qapi/error.h"
+#include "sysemu/cpus.h"
 
 /* Helper function to manage reading from and writing to the migration page
  * registers.
@@ -64,9 +65,25 @@ uint64_t snp_package_page(ram_addr_t guest_physical_addr) {
     write_address_register(guest_physical_addr);
     write_data_register(SNP_MIGRATION_DATA_ADDRESS);
 
-    // Wait for data to be ready
-    while (read_data_register() != SNP_MIGRATION_DATA_READY) {}
+    runstate_set(RUN_STATE_RUNNING);
+    CPUState *cpu;
+    CPU_FOREACH(cpu) {
+        cpu_resume(cpu);
+        if (cpu_can_run(cpu)) {
+            //qemu_log("cpu %d can run\n", cpu->cpu_index);
+        } else {
+            qemu_log("cpu %d can NOT run\n", cpu->cpu_index);
+        }
+    }
 
+    // Wait for data to be ready
+    while (read_data_register() != SNP_MIGRATION_DATA_READY) {
+        CPU_FOREACH(cpu) {
+            cpu_resume(cpu);
+        }
+    }
+
+    runstate_set(RUN_STATE_FINISH_MIGRATE);
     // Returning the pointer to the buffer holding the packaged page.
     MigrationState *s = migrate_get_current();
     return s->svsm_migration_page + DATA_BUFFER_OFFSET;

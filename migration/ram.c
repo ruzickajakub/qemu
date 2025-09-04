@@ -3290,7 +3290,7 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
         while (true) {
             int pages = 0;
 
-            // pages = ram_find_and_save_block(rs);
+            pages = ram_find_and_save_block(rs);
             /* no more blocks to sent */
             if (pages == 0) {
                 break;
@@ -3328,9 +3328,9 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
 
     qemu_put_be64(f, RAM_SAVE_FLAG_EOS);
 
-    qemu_log("KUBA: snp_package_page\n");
+    qemu_log("KUBA: ram_save_complete: snp_package_page\n");
     snp_package_page(0x0);
-    qemu_log("KUBA: snp_package_page: DONE\n");
+    qemu_log("KUBA: ram_save_complete: snp_package_page: DONE\n");
 
     return qemu_fflush(f);
 }

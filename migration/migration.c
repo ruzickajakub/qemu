@@ -2760,10 +2760,13 @@ static int migration_maybe_pause(MigrationState *s,
 static int migration_completion_precopy(MigrationState *s,
                                         int *current_active_state)
 {
-    int ret;
+    int ret = 0;
 
     bql_lock();
 
+    runstate_set(RUN_STATE_FINISH_MIGRATE);
+
+    /*
     if (!migrate_mode_is_cpr(s)) {
         ret = migration_stop_vm(s, RUN_STATE_FINISH_MIGRATE);
         if (ret < 0) {
@@ -2773,6 +2776,7 @@ static int migration_completion_precopy(MigrationState *s,
 
     ret = migration_maybe_pause(s, current_active_state,
                                 MIGRATION_STATUS_DEVICE);
+    */
     if (ret < 0) {
         goto out_unlock;
     }

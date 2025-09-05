@@ -1043,6 +1043,21 @@ static void migration_trigger_throttle(RAMState *rs)
     }
 }
 
+static void print_ms_as_hms(uint64_t ms) {
+    uint64_t hours = ms / (1000ULL * 60ULL * 60ULL);
+    ms %= (1000ULL * 60ULL * 60ULL);
+    uint64_t minutes = ms / (1000ULL * 60ULL);
+    ms %= (1000ULL * 60ULL);
+    uint64_t seconds = ms / 1000ULL;
+    uint64_t milliseconds = ms % 1000ULL;
+
+    qemu_log("%llu:%02llu:%02llu.%03llu\n",
+           (unsigned long long)hours,
+           (unsigned long long)minutes,
+           (unsigned long long)seconds,
+           (unsigned long long)milliseconds);
+}
+
 static void migration_bitmap_sync(RAMState *rs, bool last_stage)
 {
     RAMBlock *block;
@@ -1053,6 +1068,7 @@ static void migration_bitmap_sync(RAMState *rs, bool last_stage)
     if (!rs->time_last_bitmap_sync) {
         rs->time_last_bitmap_sync = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
     }
+    qemu_log("KUBA: migration_bitmap_sync : BEFORE : rs->migration_dirty_pages: %lx\n", rs->migration_dirty_pages);
 
     trace_migration_bitmap_sync_start();
     memory_global_dirty_log_sync(last_stage);
@@ -1088,6 +1104,9 @@ static void migration_bitmap_sync(RAMState *rs, bool last_stage)
         uint64_t generation = stat64_get(&mig_stats.dirty_sync_count);
         qapi_event_send_migration_pass(generation);
     }
+    print_ms_as_hms(end_time);
+    qemu_log("KUBA: migration_bitmap_sync : AFTER : rs->migration_dirty_pages: %lx\n", rs->migration_dirty_pages);
+    
 }
 
 static void migration_bitmap_sync_precopy(RAMState *rs, bool last_stage)
@@ -3335,6 +3354,9 @@ static void ram_state_pending_estimate(void *opaque, uint64_t *must_precopy,
 
     uint64_t remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
 
+    //int64_t t0 = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
+    //qemu_log("KUBA: ram_state_pending_estimate: %lu : %lu\n", t0, rs->migration_dirty_pages);
+
     if (migrate_postcopy_ram()) {
         /* We can do postcopy, and all the data is postcopiable */
         *can_postcopy += remaining_size;
@@ -3359,6 +3381,8 @@ static void ram_state_pending_exact(void *opaque, uint64_t *must_precopy,
     }
 
     remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
+
+    qemu_log("KUBA: ram_state_pending_exact %lu\n", rs->migration_dirty_pages);
 
     if (migrate_postcopy_ram()) {
         /* We can do postcopy, and all the data is postcopiable */

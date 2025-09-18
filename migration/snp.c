@@ -48,10 +48,46 @@ static void write_address_register(ram_addr_t guest_physical_addr) {
     cpu_physical_memory_write(pa, buf, sizeof(buf));
 }
 
+// Transform the bytes to uint64_t big-endian
+static inline uint64_t u64_from_be_bytes(const uint8_t b[8]) {
+    return ((uint64_t)b[0] << 56) |
+           ((uint64_t)b[1] << 48) |
+           ((uint64_t)b[2] << 40) |
+           ((uint64_t)b[3] << 32) |
+           ((uint64_t)b[4] << 24) |
+           ((uint64_t)b[5] << 16) |
+           ((uint64_t)b[6] << 8)  |
+           ((uint64_t)b[7]);
+}
+
 /* Start migration handler inside the SVSM */
 void snp_start_migration_handler(void) {
     write_data_register(SNP_MIGRATION_DATA_READ);
     write_status_register(SNP_MIGRATION_STATUS_RUNNING);
+}
+
+void snp_read_validated_pages(void) {
+    MigrationState *s = migrate_get_current();
+    uint64_t pa = s->svsm_migration_page + DATA_BUFFER_OFFSET;
+
+    //uint64_t pages[4096]; 
+    uint64_t total = 0;
+    while (true) {
+        uint8_t status = read_data_register();
+        if (status == SNP_MIGRATION_DATA_READY) {
+            break;
+        }
+        else if (status == SNP_MIGRATION_DATA_VALIDATED) {
+            // Process the pages
+            uint8_t buf[4096];
+            cpu_physical_memory_read(pa, buf, DATA_BUFFER_SIZE);
+            uint64_t page_count = u64_from_be_bytes(buf);
+            total += page_count;
+            write_data_register(SNP_MIGRATION_DATA_READ);
+        }
+    }
+    qemu_log("snp: validated pages %ln\n", total);
+    write_data_register(SNP_MIGRATION_DATA_READ);
 }
 
 static uint64_t make_u64_be(const uint8_t *buf) {

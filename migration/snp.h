@@ -21,6 +21,7 @@
 #define SNP_MIGRATION_DATA_READY 0x4
 #define SNP_MIGRATION_DATA_READ 0x5
 #define SNP_MIGRATION_DATA_ADDRESS 0x6
+#define SNP_MIGRATION_DATA_VALIDATED 0x7
 
 // SVSM migration page layout
 #define STATUS_REGISTER_OFFSET 0x0
@@ -31,6 +32,7 @@
 
 void snp_start_migration_handler(void);
 void snp_stop_migration_handler(void);
+void snp_read_validated_pages(void);
 uint64_t snp_package_page(ram_addr_t guest_physical_addr);
 
 #endif

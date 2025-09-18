@@ -3196,6 +3196,9 @@ void ramblock_set_file_bmap_atomic(RAMBlock *block, ram_addr_t offset, bool set)
  * @f: QEMUFile where to send the data
  * @opaque: RAMState pointer
  */
+
+bool validated_sync = false;
+
 static int ram_save_iterate(QEMUFile *f, void *opaque)
 {
     RAMState **temp = opaque;
@@ -3204,6 +3207,15 @@ static int ram_save_iterate(QEMUFile *f, void *opaque)
     int i;
     int64_t t0;
     int done = 0;
+
+    if (x86_is_machine_confidential()) {
+        if (!validated_sync) {
+            snp_read_validated_pages();
+            validated_sync = true;
+        }
+    }
+
+
 
     /*
      * We'll take this lock a little bit long, but it's okay for two reasons.

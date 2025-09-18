@@ -32,7 +32,7 @@
 
 void snp_start_migration_handler(void);
 void snp_stop_migration_handler(void);
-void snp_read_validated_pages(void);
+uint64_t snp_read_validated_pages(void);
 uint64_t snp_package_page(ram_addr_t guest_physical_addr);
 
 #endif

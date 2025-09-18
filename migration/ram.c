@@ -1185,12 +1185,15 @@ static int save_zero_page(RAMState *rs, PageSearchStatus *pss,
     QEMUFile *file = pss->pss_channel;
     int len = 0;
 
-    if (migrate_zero_page_detection() == ZERO_PAGE_DETECTION_NONE) {
-        return 0;
-    }
+    if (!x86_is_machine_confidential()) {
+        // checks only done for non-confidential machines
+        if (migrate_zero_page_detection() == ZERO_PAGE_DETECTION_NONE) {
+            return 0;
+        }
 
-    if (!buffer_is_zero(p, TARGET_PAGE_SIZE)) {
-        return 0;
+        if (!buffer_is_zero(p, TARGET_PAGE_SIZE)) {
+            return 0;
+        }
     }
 
     stat64_add(&mig_stats.zero_pages, 1);
@@ -2056,12 +2059,22 @@ int ram_save_queue_pages(const char *rbname, ram_addr_t start, ram_addr_t len,
  * @rs: current RAM state
  * @pss: data about the page we want to send
  */
+uint64_t validated = 0;
 static int ram_save_target_page_legacy(RAMState *rs, PageSearchStatus *pss)
 {
     ram_addr_t offset = ((ram_addr_t)pss->page) << TARGET_PAGE_BITS;
     int res;
 
     if (x86_is_machine_confidential()) {
+        if (stat64_get(&mig_stats.dirty_sync_count) == 1) {
+            // Simulating the zero page optimization
+            if (validated > 0) {
+                validated -= 1;
+                return ram_save_page(rs, pss);
+            }
+            save_zero_page(rs, pss, offset);
+            return 1;
+        }
         return ram_save_page(rs, pss);
     }
     //return ram_save_page(rs, pss);
@@ -3210,12 +3223,10 @@ static int ram_save_iterate(QEMUFile *f, void *opaque)
 
     if (x86_is_machine_confidential()) {
         if (!validated_sync) {
-            snp_read_validated_pages();
+            validated = snp_read_validated_pages();
             validated_sync = true;
         }
     }
-
-
 
     /*
      * We'll take this lock a little bit long, but it's okay for two reasons.

@@ -66,7 +66,7 @@ void snp_start_migration_handler(void) {
     write_status_register(SNP_MIGRATION_STATUS_RUNNING);
 }
 
-void snp_read_validated_pages(void) {
+uint64_t snp_read_validated_pages(void) {
     MigrationState *s = migrate_get_current();
     uint64_t pa = s->svsm_migration_page + DATA_BUFFER_OFFSET;
 
@@ -88,6 +88,7 @@ void snp_read_validated_pages(void) {
     }
     qemu_log("snp: validated pages %lu\n", total);
     write_data_register(SNP_MIGRATION_DATA_READ);
+    return total;
 }
 
 static uint64_t make_u64_be(const uint8_t *buf) {

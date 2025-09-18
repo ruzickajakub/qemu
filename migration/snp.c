@@ -86,7 +86,7 @@ void snp_read_validated_pages(void) {
             write_data_register(SNP_MIGRATION_DATA_READ);
         }
     }
-    qemu_log("snp: validated pages %ln\n", total);
+    qemu_log("snp: validated pages %lu\n", total);
     write_data_register(SNP_MIGRATION_DATA_READ);
 }
 

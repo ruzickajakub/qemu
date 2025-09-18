@@ -219,7 +219,9 @@ static int migration_stop_vm(MigrationState *s, RunState state)
 {
     int ret;
 
-    //migration_downtime_start(s);
+    if (!x86_is_machine_confidential()) {
+        migration_downtime_start(s);
+    }
 
     s->vm_old_state = runstate_get();
     global_state_store();
@@ -2853,6 +2855,8 @@ static void migration_completion(MigrationState *s)
     int ret = 0;
     int current_active_state = s->state;
     Error *local_err = NULL;
+
+    qemu_log("start migration_completion\n");
 
     if (s->state == MIGRATION_STATUS_ACTIVE) {
         ret = migration_completion_precopy(s, &current_active_state);

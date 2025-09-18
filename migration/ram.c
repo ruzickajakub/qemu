@@ -1043,7 +1043,18 @@ static void migration_trigger_throttle(RAMState *rs)
     }
 }
 
-static void print_ms_as_hms(uint64_t ms) {
+static char *migration_duration_str(void)
+{
+    MigrationState *s = migrate_get_current();
+    if (!s) {
+        char *ret = malloc(16);
+        if (ret) snprintf(ret, 16, "0:00:00.000");
+        return ret;
+    }
+
+    uint64_t now = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
+    uint64_t ms = now - s->start_time;
+
     uint64_t hours = ms / (1000ULL * 60ULL * 60ULL);
     ms %= (1000ULL * 60ULL * 60ULL);
     uint64_t minutes = ms / (1000ULL * 60ULL);
@@ -1051,11 +1062,32 @@ static void print_ms_as_hms(uint64_t ms) {
     uint64_t seconds = ms / 1000ULL;
     uint64_t milliseconds = ms % 1000ULL;
 
-    qemu_log("%llu:%02llu:%02llu.%03llu\n",
-           (unsigned long long)hours,
-           (unsigned long long)minutes,
-           (unsigned long long)seconds,
-           (unsigned long long)milliseconds);
+    /* compute needed buffer size: "HHH:MM:SS.mmm\n" -> hours can be large,
+       so allow up to 20 chars for hours + rest (":MM:SS.mmm\n" = 12) */
+    size_t buf_size = 32;
+    char *buf = malloc(buf_size);
+    if (!buf) return NULL;
+
+    /* use snprintf for safety */
+    int written = snprintf(buf, buf_size, "%llu:%02llu:%02llu.%03llu",
+                           (unsigned long long)hours,
+                           (unsigned long long)minutes,
+                           (unsigned long long)seconds,
+                           (unsigned long long)milliseconds);
+    if (written < 0) { free(buf); return NULL; }
+    if ((size_t)written >= buf_size) {
+        /* buffer too small: resize and write again */
+        buf_size = (size_t)written + 1;
+        char *tmp = realloc(buf, buf_size);
+        if (!tmp) { free(buf); return NULL; }
+        buf = tmp;
+        snprintf(buf, buf_size, "%llu:%02llu:%02llu.%03llu",
+                 (unsigned long long)hours,
+                 (unsigned long long)minutes,
+                 (unsigned long long)seconds,
+                 (unsigned long long)milliseconds);
+    }
+    return buf;
 }
 
 static void migration_bitmap_sync(RAMState *rs, bool last_stage)
@@ -1068,7 +1100,7 @@ static void migration_bitmap_sync(RAMState *rs, bool last_stage)
     if (!rs->time_last_bitmap_sync) {
         rs->time_last_bitmap_sync = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
     }
-    qemu_log("KUBA: migration_bitmap_sync : BEFORE : rs->migration_dirty_pages: %lx\n", rs->migration_dirty_pages);
+    qemu_log("%s: migration_bitmap_sync : BEFORE : rs->migration_dirty_pages: %lu\n", migration_duration_str(), rs->migration_dirty_pages);
 
     trace_migration_bitmap_sync_start();
     memory_global_dirty_log_sync(last_stage);
@@ -1104,8 +1136,7 @@ static void migration_bitmap_sync(RAMState *rs, bool last_stage)
         uint64_t generation = stat64_get(&mig_stats.dirty_sync_count);
         qapi_event_send_migration_pass(generation);
     }
-    print_ms_as_hms(end_time);
-    qemu_log("KUBA: migration_bitmap_sync : AFTER : rs->migration_dirty_pages: %lx\n", rs->migration_dirty_pages);
+    qemu_log("%s: migration_bitmap_sync : AFTER : rs->migration_dirty_pages: %lu\n", migration_duration_str(), rs->migration_dirty_pages);
     
 }
 
@@ -2033,6 +2064,7 @@ static int ram_save_target_page_legacy(RAMState *rs, PageSearchStatus *pss)
     if (x86_is_machine_confidential()) {
         return ram_save_page(rs, pss);
     }
+    //return ram_save_page(rs, pss);
 
     if (control_save_page(pss, offset, &res)) {
         return res;
@@ -3382,7 +3414,7 @@ static void ram_state_pending_exact(void *opaque, uint64_t *must_precopy,
 
     remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
 
-    qemu_log("KUBA: ram_state_pending_exact %lu\n", rs->migration_dirty_pages);
+    qemu_log("%s: ram_state_pending_exact %lu\n",migration_duration_str(), rs->migration_dirty_pages);
 
     if (migrate_postcopy_ram()) {
         /* We can do postcopy, and all the data is postcopiable */
